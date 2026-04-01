@@ -1,0 +1,64 @@
+services:
+  # server:
+  #   build:
+  #     context: .
+  #     target: final
+  #   ports:
+  #     - 4000:4000
+  #   depends_on:
+  #     migrate:
+  #       condition: service_completed_successfully
+  user-api-localstack:
+    image: localstack/localstack:latest
+    env_file:
+      - .env
+    environment:
+      # Community: omit rds (requires Pro). Override: LOCALSTACK_SERVICES=rds,s3,secretsmanager,lambda
+      - "SERVICES=${LOCALSTACK_SERVICES:-s3,secretsmanager,lambda}"
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ENDPOINT=http://localhost:4566
+      - AWS_REGION=us-east-1
+      # RDS init is opt-in; requires LocalStack Pro + rds in SERVICES
+      - ENABLE_LOCALSTACK_RDS=${ENABLE_LOCALSTACK_RDS:-1}
+      - RDS_DB_INSTANCE_IDENTIFIER=${RDS_DB_INSTANCE_IDENTIFIER:-user-api-rds}
+      - RDS_MASTER_USERNAME=${RDS_MASTER_USERNAME:-homehubadmin}
+      - RDS_MASTER_PASSWORD=${RDS_MASTER_PASSWORD:-homehubpassword}
+      - RDS_DB_NAME=${RDS_DB_NAME:-homehub}
+      - RDS_INSTANCE_CLASS=${RDS_INSTANCE_CLASS:-db.t3.micro}
+      - RDS_ALLOCATED_STORAGE=${RDS_ALLOCATED_STORAGE:-20}
+    volumes:
+      - ./localstack:/var/lib/localstack/data
+      - "./scripts/init-localstack.sh:/etc/localstack/init/ready.d/init.sh"
+      # Go module root for init-localstack.sh (builds cmd/lambda or uses pre-built lambda-package.zip)
+      - "./:/tmp/source:ro"
+      - "./lambda-package:/tmp/lambda-package"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Atlas migrations: runs after Postgres is up (not inside initdb — needs network + mounted /migrations).
+  # Re-runs on every `compose up`; `atlas migrate apply` is idempotent for already-applied revisions.
+  migrate:
+    image: arigaio/atlas:latest
+    depends_on:
+      user-api-localstack:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://homehubuser:homehubpassword@database:5432/homehub?sslmode=disable
+    volumes:
+      - ./migrations:/migrations:ro
+    command:
+      - migrate
+      - apply
+      - --url
+      - ${DATABASE_URL}
+      - --dir
+      - file:///migrations
+    restart: "no"
+

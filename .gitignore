@@ -1,0 +1,9 @@
+# LocalStack generated (contains DB URL with password)
+localstack/rds-endpoint.env
+.env
+
+lambda-package/
+
+.DS_Store
+
+localstack/
