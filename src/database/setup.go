@@ -1,25 +1,25 @@
 package database
 
 import (
+	"database/sql"
 	"log"
 
 	"gorm.io/gorm"
 )
 
-func SetupDatabase(config *DatabaseConfig) *gorm.DB {
+func SetupDatabase(config *DatabaseConfig) (*gorm.DB, *sql.DB) {
 	log.Println("Database setup starting...")
 	connection := Connect(config)
 
 	log.Println("Database migrations applied")
 
-	_db := GetDB(connection)
+	db := GetDB(connection)
 
-	if err := _db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-		panic(err)
+	if err := db.Ping(); err != nil {
+		panic("Failed to ping database: " + err.Error())
 	}
 
 	log.Println("Database connected and healthy")
 
-	return connection
+	return connection, db
 }

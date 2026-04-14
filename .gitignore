@@ -7,3 +7,4 @@ lambda-package/
 .DS_Store
 
 localstack/
+aws.env

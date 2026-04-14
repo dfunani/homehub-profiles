@@ -3,7 +3,6 @@ package serialisers
 import (
 	"dfunani/homehub-profiles/src/database/models"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +20,6 @@ type ProfileMediaSerialiser struct {
 	PublicURL   string `json:"public_url,omitempty"`
 	Kind        string `json:"kind"`
 	Caption     string `json:"caption,omitempty"`
-	SortOrder   int64  `json:"sort_order"`
 	Width       *int   `json:"width,omitempty"`
 	Height      *int   `json:"height,omitempty"`
 	ContentType string `json:"content_type,omitempty"`
@@ -40,7 +38,6 @@ func (m *ProfileMediaSerialiser) FromModel(x *models.ProfileMedia) *ProfileMedia
 		PublicURL:   x.PublicURL,
 		Kind:        string(x.Kind),
 		Caption:     x.Caption,
-		SortOrder:   x.SortOrder,
 		Width:       x.Width,
 		Height:      x.Height,
 		ContentType: x.ContentType,
@@ -61,7 +58,6 @@ func (m *ProfileMediaSerialiser) ToModel() *models.ProfileMedia {
 		PublicURL:   m.PublicURL,
 		Kind:        kind,
 		Caption:     m.Caption,
-		SortOrder:   m.SortOrder,
 		Width:       m.Width,
 		Height:      m.Height,
 		ContentType: m.ContentType,
@@ -86,18 +82,8 @@ func (m *ProfileMediaSerialiser) FromJSON(data []byte) *ProfileMediaSerialiser {
 // CreateProfileMedia inserts a media row for a profile.
 func CreateProfileMedia(db *gorm.DB, m *ProfileMediaSerialiser) *ProfileMediaSerialiser {
 	x := m.ToModel()
-	if x.ID == uuid.Nil {
-		x.ID = uuid.New()
-	}
-	now := time.Now().UTC()
-	if x.CreatedAt.IsZero() {
-		x.CreatedAt = now
-	}
-	if x.UpdatedAt.IsZero() {
-		x.UpdatedAt = now
-	}
 	if err := db.Create(x).Error; err != nil {
-		log.Fatalf("Failed to create profile media: %v", err)
+		panic("Failed to create profile media: " + err.Error())
 	}
 	return m.FromModel(x)
 }
@@ -106,7 +92,7 @@ func CreateProfileMedia(db *gorm.DB, m *ProfileMediaSerialiser) *ProfileMediaSer
 func GetProfileMedia(db *gorm.DB, id uuid.UUID) *ProfileMediaSerialiser {
 	var x models.ProfileMedia
 	if err := db.First(&x, "id = ?", id).Error; err != nil {
-		log.Fatalf("Failed to get profile media: %v", err)
+		panic("Failed to get profile media: " + err.Error())
 	}
 	return (&ProfileMediaSerialiser{}).FromModel(&x)
 }

@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 
@@ -14,38 +13,49 @@ import (
 // DatabaseConfig is the shared DB settings type (alias to database.DatabaseConfig).
 type DatabaseConfig = dbpkg.DatabaseConfig
 
-func GetDatabaseConfig() DatabaseConfig {
+func GetDatabaseConfig(environment string) DatabaseConfig {
+	port := os.Getenv("POSTGRES_PORT")
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		portInt = 5432
+	}
+	host := os.Getenv("POSTGRES_HOST")
+	user := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("POSTGRES_PASSWORD")
+	dbName := os.Getenv("POSTGRES_DB")
+
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
-		region = os.Getenv("AWS_DEFAULT_REGION")
-	}
-	opts := []func(*awscfg.LoadOptions) error{}
-	if region != "" {
-		opts = append(opts, awscfg.WithRegion(region))
-	}
-	if p := os.Getenv("AWS_PROFILE"); p != "" {
-		opts = append(opts, awscfg.WithSharedConfigProfile(p))
+		region = "eu-north-1"
 	}
 
-	cfg, err := awscfg.LoadDefaultConfig(context.TODO(), opts...)
+	cfg, err := awscfg.LoadDefaultConfig(context.TODO(), awscfg.WithRegion(region))
 	if err != nil {
 		panic("failed to load AWS config: " + err.Error())
 	}
-	port := os.Getenv("POSTGRES_PORT")
-	fmt.Println("POSTGRES_PORT: ", port)
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		panic("failed to convert POSTGRES_PORT to int: " + err.Error())
+
+	if environment == "local" {
+		return DatabaseConfig{
+			Host:      host,
+			User:      user,
+			Password:  password,
+			DBName:    dbName,
+			Port:      portInt,
+			Region:    region,
+			RDSConfig: &cfg,
+			SSLMode:   "disable",
+		}
 	}
-	password := dbpkg.Auth()
+
+	authToken := dbpkg.RDSAuth(host, user)
 	return DatabaseConfig{
-		Host:      os.Getenv("POSTGRES_HOST"),
-		User:      os.Getenv("POSTGRES_USER"),
-		Password:  password,
-		DBName:    os.Getenv("POSTGRES_DB"),
+		Host:      host,
+		User:      user,
+		Password:  authToken,
+		DBName:    dbName,
 		Port:      portInt,
 		Region:    region,
 		RDSConfig: &cfg,
-		SSLMode:   os.Getenv("POSTGRES_SSLMODE"),
+		SSLMode:   "require",
 	}
 }

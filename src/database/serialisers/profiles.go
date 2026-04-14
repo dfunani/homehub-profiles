@@ -3,10 +3,12 @@ package serialisers
 import (
 	"dfunani/homehub-profiles/src/database/models"
 	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -14,20 +16,20 @@ import (
 // ProfileSerialiser is the API shape for a profile (no nested user model).
 type ProfileSerialiser struct {
 	ID        uuid.UUID `json:"id,omitempty"`
-	UserID    uuid.UUID `json:"user_id"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 
-	DisplayName      string `json:"display_name,omitempty"`
-	Bio              string `json:"bio,omitempty"`
-	Headline         string `json:"headline,omitempty"`
-	Locale           string `json:"locale,omitempty"`
-	Timezone         string `json:"timezone,omitempty"`
-	Phone            string `json:"phone,omitempty"`
-	AvatarStorageKey string `json:"avatar_storage_key,omitempty"`
-	Links            []byte `json:"links,omitempty"`        // raw JSON array; stored as jsonb
-	Preferences      []byte `json:"preferences,omitempty"`  // raw JSON object
-	Status           string `json:"status,omitempty"`
+	UserID           uuid.UUID `json:"user_id"`
+	DisplayName      string    `json:"display_name"`
+	Bio              string    `json:"bio"`
+	Headline         string    `json:"headline"`
+	Locale           string    `json:"locale"`
+	Timezone         string    `json:"timezone"`
+	Phone            string    `json:"phone"`
+	AvatarStorageKey string    `json:"avatar_storage_key"`
+	Links            []byte    `json:"links"`       // raw JSON array; stored as jsonb
+	Preferences      []byte    `json:"preferences"` // raw JSON object
+	Status           string    `json:"status"`
 
 	Media []ProfileMediaSerialiser `json:"media,omitempty"`
 }
@@ -66,15 +68,8 @@ func (p *ProfileSerialiser) FromModel(m *models.Profile) *ProfileSerialiser {
 }
 
 func (p *ProfileSerialiser) ToModel() *models.Profile {
-	st := models.ProfileStatusActive
-	if p.Status != "" {
-		st = models.ProfileStatus(p.Status)
-	}
 	m := &models.Profile{
-		ID:               p.ID,
 		UserID:           p.UserID,
-		CreatedAt:        p.CreatedAt,
-		UpdatedAt:        p.UpdatedAt,
 		DisplayName:      p.DisplayName,
 		Bio:              p.Bio,
 		Headline:         p.Headline,
@@ -82,13 +77,12 @@ func (p *ProfileSerialiser) ToModel() *models.Profile {
 		Timezone:         p.Timezone,
 		Phone:            p.Phone,
 		AvatarStorageKey: p.AvatarStorageKey,
-		Status:           st,
 	}
 	if len(p.Links) > 0 {
-		m.Links = datatypes.JSON(append([]byte(nil), p.Links...))
+		m.Links = datatypes.JSON(p.Links)
 	}
 	if len(p.Preferences) > 0 {
-		m.Preferences = datatypes.JSON(append([]byte(nil), p.Preferences...))
+		m.Preferences = datatypes.JSON(p.Preferences)
 	}
 	return m
 }
@@ -108,30 +102,24 @@ func (p *ProfileSerialiser) FromJSON(data []byte) *ProfileSerialiser {
 	return p
 }
 
+func isDuplicateKeyError(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
 // CreateProfile persists a new profile. IDs and timestamps are filled by GORM/DB when empty.
 func CreateProfile(db *gorm.DB, p *ProfileSerialiser) *ProfileSerialiser {
 	m := p.ToModel()
-	if m.ID == uuid.Nil {
-		m.ID = uuid.New()
-	}
-	now := time.Now().UTC()
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = now
-	}
-	if m.UpdatedAt.IsZero() {
-		m.UpdatedAt = now
-	}
-	if m.Status == "" {
-		m.Status = models.ProfileStatusActive
-	}
-	if len(m.Links) == 0 {
-		m.Links = datatypes.JSON(`[]`)
-	}
-	if len(m.Preferences) == 0 {
-		m.Preferences = datatypes.JSON(`{}`)
-	}
 	if err := db.Create(m).Error; err != nil {
-		log.Fatalf("Failed to create profile: %v", err)
+		log.Printf("[Profile] Error creating profile: %s", err.Error())
+		if isDuplicateKeyError(err) {
+			log.Printf("[Profile] Profile already exists for user: %s", m.UserID.String())
+			panic("Profile already exists for user: " + m.UserID.String())
+		}
+		panic("Failed to create profile: " + err.Error())
 	}
 	return p.FromModel(m)
 }
@@ -141,12 +129,12 @@ func GetProfile(db *gorm.DB, id uuid.UUID, preloadMedia bool) *ProfileSerialiser
 	q := db
 	if preloadMedia {
 		q = q.Preload("Media", func(tx *gorm.DB) *gorm.DB {
-			return tx.Order("sort_order ASC, created_at ASC")
+			return tx.Order("created_at ASC")
 		})
 	}
 	var m models.Profile
 	if err := q.First(&m, "id = ?", id).Error; err != nil {
-		log.Fatalf("Failed to get profile: %v", err)
+		panic("Failed to get profile: " + err.Error())
 	}
 	return (&ProfileSerialiser{}).FromModel(&m)
 }
@@ -156,12 +144,12 @@ func GetProfileByUserID(db *gorm.DB, userID uuid.UUID, preloadMedia bool) *Profi
 	q := db
 	if preloadMedia {
 		q = q.Preload("Media", func(tx *gorm.DB) *gorm.DB {
-			return tx.Order("sort_order ASC, created_at ASC")
+			return tx.Order("created_at ASC")
 		})
 	}
 	var m models.Profile
 	if err := q.Where("user_id = ?", userID).First(&m).Error; err != nil {
-		log.Fatalf("Failed to get profile by user_id: %v", err)
+		panic("Failed to get profile by user_id: " + err.Error())
 	}
 	return (&ProfileSerialiser{}).FromModel(&m)
 }

@@ -25,7 +25,7 @@ Set in `.env` or `compose.yaml` (defaults shown):
 
 | Variable | Default | Notes |
 |----------|---------|--------|
-| `RDS_DB_INSTANCE_IDENTIFIER` | `user-api-rds` | |
+| `RDS_DB_INSTANCE_IDENTIFIER` | `profiles-api-rds` | |
 | `RDS_MASTER_USERNAME` | `homehubadmin` | **Cannot be `postgres`** (LocalStack restriction). |
 | `RDS_MASTER_PASSWORD` | `homehubpassword` | |
 | `RDS_DB_NAME` | `homehub` | Avoid using `postgres` as DB name on older LocalStack. |

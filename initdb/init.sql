@@ -1,2 +1,0 @@
--- Runs once on first DB init (empty data volume). POSTGRES_DB already creates the database.
--- Add extensions or seed SQL here if needed.

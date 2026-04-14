@@ -2,17 +2,21 @@ package config
 
 import (
 	"log"
+	"os"
 )
 
 type Environment struct {
 	DatabaseConfig DatabaseConfig
+	Environment    string
 }
 
 func SetupEnvironment() Environment {
-	log.Println("Environment setup starting...")
-	environment := Environment{
-		DatabaseConfig: GetDatabaseConfig(),
+	environment := os.Getenv("ENVIRONMENT")
+	log.Printf("%s Environment setup starting...", environment)
+	environmentConfig := Environment{
+		DatabaseConfig: GetDatabaseConfig(environment),
+		Environment:    environment,
 	}
-	log.Println("Environment setup complete")
-	return environment
+	log.Printf("%s Environment setup complete", environmentConfig.Environment)
+	return environmentConfig
 }

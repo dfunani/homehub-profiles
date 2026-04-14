@@ -11,28 +11,17 @@ import (
 type ProfileStatus string
 
 const (
+	ProfileStatusUnknown   ProfileStatus = "new"
+	ProfileStatusPending   ProfileStatus = "pending"
 	ProfileStatusActive    ProfileStatus = "active"
-	ProfileStatusHidden    ProfileStatus = "hidden"
 	ProfileStatusSuspended ProfileStatus = "suspended"
+	ProfileStatusDeleted   ProfileStatus = "deleted"
+	ProfileStatusArchived  ProfileStatus = "archived"
 )
 
-// MediaKind categorizes stored objects (avatar vs gallery vs documents).
-type MediaKind string
-
-const (
-	MediaKindAvatar   MediaKind = "avatar"
-	MediaKindCover    MediaKind = "cover"
-	MediaKindGallery  MediaKind = "gallery"
-	MediaKindDocument MediaKind = "document"
-)
-
-// Profile is the public-facing user record. Heavy blobs live in object storage;
-// we store keys / optional CDN URLs on Profile and ProfileMedia.
 type Profile struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
-	CreatedAt time.Time `gorm:"not null"`
-	UpdatedAt time.Time `gorm:"not null"`
+	ID     uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID uuid.UUID `gorm:"type:uuid;not null;unique"`
 
 	DisplayName string `gorm:"size:255"`
 	Bio         string `gorm:"type:text"`
@@ -45,14 +34,17 @@ type Profile struct {
 	AvatarStorageKey string `gorm:"size:1024"`
 
 	// Links: JSON array of { "label": "...", "url": "https://..." }
-	Links datatypes.JSON `gorm:"type:jsonb"`
+	Links datatypes.JSON `gorm:"type:jsonb;default:'[]'::json"`
 
 	// Preferences: arbitrary JSON (notifications, theme, etc.)
-	Preferences datatypes.JSON `gorm:"type:jsonb"`
+	Preferences datatypes.JSON `gorm:"type:jsonb;default:'{}'::json"`
 
-	Status ProfileStatus `gorm:"type:varchar(32);not null;default:active"`
+	Status          ProfileStatus `gorm:"type:varchar(32);not null;default:new"`
+	StatusUpdatedAt time.Time     `gorm:"not null;default:now()"`
 
-	Media []ProfileMedia `gorm:"foreignKey:ProfileID;constraint:OnDelete:CASCADE"`
+	Media     []ProfileMedia `gorm:"foreignKey:ProfileID;constraint:OnDelete:CASCADE"`
+	CreatedAt time.Time      `gorm:"not null;default:now()"`
+	UpdatedAt time.Time      `gorm:"not null;index"`
 }
 
 func (Profile) TableName() string {

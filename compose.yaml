@@ -8,26 +8,24 @@ services:
   #   depends_on:
   #     migrate:
   #       condition: service_completed_successfully
-  user-api-localstack:
+
+  database:
+    image: postgres:17
+    env_file:
+      - .env
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  profiles-api-localstack:
     image: localstack/localstack:latest
     env_file:
       - .env
-    environment:
-      # Community: omit rds (requires Pro). Override: LOCALSTACK_SERVICES=rds,s3,secretsmanager,lambda
-      - "SERVICES=${LOCALSTACK_SERVICES:-s3,secretsmanager,lambda}"
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
-      - AWS_ENDPOINT=http://localhost:4566
-      - AWS_REGION=us-east-1
-      # RDS init is opt-in; requires LocalStack Pro + rds in SERVICES
-      - ENABLE_LOCALSTACK_RDS=${ENABLE_LOCALSTACK_RDS:-1}
-      - RDS_DB_INSTANCE_IDENTIFIER=${RDS_DB_INSTANCE_IDENTIFIER:-user-api-rds}
-      - RDS_MASTER_USERNAME=${RDS_MASTER_USERNAME:-homehubadmin}
-      - RDS_MASTER_PASSWORD=${RDS_MASTER_PASSWORD:-homehubpassword}
-      - RDS_DB_NAME=${RDS_DB_NAME:-homehub}
-      - RDS_INSTANCE_CLASS=${RDS_INSTANCE_CLASS:-db.t3.micro}
-      - RDS_ALLOCATED_STORAGE=${RDS_ALLOCATED_STORAGE:-20}
     volumes:
       - ./localstack:/var/lib/localstack/data
       - "./scripts/init-localstack.sh:/etc/localstack/init/ready.d/init.sh"
@@ -47,17 +45,17 @@ services:
   migrate:
     image: arigaio/atlas:latest
     depends_on:
-      user-api-localstack:
+      database:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://homehubuser:homehubpassword@database:5432/homehub?sslmode=disable
+    env_file:
+      - .env
     volumes:
       - ./migrations:/migrations:ro
     command:
       - migrate
       - apply
       - --url
-      - ${DATABASE_URL}
+      - postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
       - --dir
       - file:///migrations
     restart: "no"
