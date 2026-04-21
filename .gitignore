@@ -8,3 +8,6 @@ lambda-package/
 
 localstack/
 aws.env
+
+# Air live-reload build output
+tmp/

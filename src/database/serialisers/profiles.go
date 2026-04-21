@@ -19,17 +19,17 @@ type ProfileSerialiser struct {
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 
-	UserID           uuid.UUID `json:"user_id"`
-	DisplayName      string    `json:"display_name"`
-	Bio              string    `json:"bio"`
-	Headline         string    `json:"headline"`
-	Locale           string    `json:"locale"`
-	Timezone         string    `json:"timezone"`
-	Phone            string    `json:"phone"`
-	AvatarStorageKey string    `json:"avatar_storage_key"`
-	Links            []byte    `json:"links"`       // raw JSON array; stored as jsonb
-	Preferences      []byte    `json:"preferences"` // raw JSON object
-	Status           string    `json:"status"`
+	UserID           uuid.UUID           `json:"user_id"`
+	DisplayName      string              `json:"display_name"`
+	Bio              string              `json:"bio"`
+	Headline         string              `json:"headline"`
+	Locale           string              `json:"locale"`
+	Timezone         string              `json:"timezone"`
+	Phone            string              `json:"phone"`
+	AvatarStorageKey string              `json:"avatar_storage_key"`
+	Links            []map[string]string `json:"links"`       // raw JSON array; stored as jsonb
+	Preferences      map[string]string   `json:"preferences"` // raw JSON object
+	Status           string              `json:"status"`
 
 	Media []ProfileMediaSerialiser `json:"media,omitempty"`
 }
@@ -52,12 +52,20 @@ func (p *ProfileSerialiser) FromModel(m *models.Profile) *ProfileSerialiser {
 		AvatarStorageKey: m.AvatarStorageKey,
 		Status:           string(m.Status),
 	}
-	if len(m.Links) > 0 {
-		out.Links = append([]byte(nil), m.Links...)
+	var links []map[string]string
+	err := json.Unmarshal(m.Links, &links)
+	if err != nil {
+		panic("Failed to marshal links: " + err.Error())
 	}
-	if len(m.Preferences) > 0 {
-		out.Preferences = append([]byte(nil), m.Preferences...)
+	out.Links = links
+
+	var preferences map[string]string
+	err = json.Unmarshal(m.Preferences, &preferences)
+	if err != nil {
+		panic("Failed to marshal preferences: " + err.Error())
 	}
+	out.Preferences = preferences
+
 	for i := range m.Media {
 		item := (&ProfileMediaSerialiser{}).FromModel(&m.Media[i])
 		if item != nil {
@@ -79,10 +87,18 @@ func (p *ProfileSerialiser) ToModel() *models.Profile {
 		AvatarStorageKey: p.AvatarStorageKey,
 	}
 	if len(p.Links) > 0 {
-		m.Links = datatypes.JSON(p.Links)
+		links, err := json.Marshal(p.Links)
+		if err != nil {
+			panic("Failed to marshal links: " + err.Error())
+		}
+		m.Links = datatypes.JSON(links)
 	}
 	if len(p.Preferences) > 0 {
-		m.Preferences = datatypes.JSON(p.Preferences)
+		preferences, err := json.Marshal(p.Preferences)
+		if err != nil {
+			panic("Failed to marshal preferences: " + err.Error())
+		}
+		m.Preferences = datatypes.JSON(preferences)
 	}
 	return m
 }
@@ -134,6 +150,7 @@ func GetProfile(db *gorm.DB, id uuid.UUID, preloadMedia bool) *ProfileSerialiser
 	}
 	var m models.Profile
 	if err := q.First(&m, "id = ?", id).Error; err != nil {
+		log.Printf("[Profile] Error getting profile: %s", err.Error())
 		panic("Failed to get profile: " + err.Error())
 	}
 	return (&ProfileSerialiser{}).FromModel(&m)
@@ -149,6 +166,7 @@ func GetProfileByUserID(db *gorm.DB, userID uuid.UUID, preloadMedia bool) *Profi
 	}
 	var m models.Profile
 	if err := q.Where("user_id = ?", userID).First(&m).Error; err != nil {
+		log.Printf("[Profile] Error getting profile by user_id: %s", err.Error())
 		panic("Failed to get profile by user_id: " + err.Error())
 	}
 	return (&ProfileSerialiser{}).FromModel(&m)

@@ -1,13 +1,17 @@
 services:
-  # server:
-  #   build:
-  #     context: .
-  #     target: final
-  #   ports:
-  #     - 4000:4000
-  #   depends_on:
-  #     migrate:
-  #       condition: service_completed_successfully
+  server:
+    build:
+      context: .
+      target: final
+    env_file:
+      - .env
+    ports:
+      - 8081:8081
+    volumes:
+      - ./src:/src
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   database:
     image: postgres:17

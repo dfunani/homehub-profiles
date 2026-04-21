@@ -18,6 +18,7 @@ WORKDIR /src
 # the container.
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.mod,target=go.mod \
+    --mount=type=bind,source=go.sum,target=go.sum \
     go mod download -x
 
 # This is the architecture you're building for, which is passed in by the builder.
@@ -30,7 +31,7 @@ ARG TARGETARCH
 # source code into the container.
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server .
+    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./src
 
 ################################################################################
 # Create a new stage for running the application that contains the minimal
@@ -71,7 +72,7 @@ USER appuser
 COPY --from=build /bin/server /bin/
 
 # Expose the port that the application listens on.
-EXPOSE 4000
+EXPOSE 8081
 
 # curl -sSf https://atlasgo.sh | sh
 # go get -u ariga.io/atlas-provider-gorm

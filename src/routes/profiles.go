@@ -30,20 +30,7 @@ func createProfileMedia(context *gin.Context, connection *gorm.DB, id string) {
 func createProfile(context *gin.Context, connection *gorm.DB) {
 	var profile serialisers.ProfileSerialiser
 	json.NewDecoder(context.Request.Body).Decode(&profile)
-	links, err := json.Marshal(profile.Links)
-	if err != nil {
-		log.Printf("[Profile] Error marshalling links: %s", err.Error())
-		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	profile.Links = links
-	preferences, err := json.Marshal(profile.Preferences)
-	if err != nil {
-		log.Printf("[Profile] Error marshalling preferences: %s", err.Error())
-		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	profile.Preferences = preferences
+
 	created := serialisers.CreateProfile(connection, &profile)
 	log.Printf("[Profile] Profile created: %s", created.ID)
 	context.JSON(http.StatusOK, created)
