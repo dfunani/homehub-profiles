@@ -9,7 +9,8 @@
 ################################################################################
 # Create a stage for building the application.
 ARG GO_VERSION=1.25.1
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
+# Omit --platform=$BUILDPLATFORM so legacy (non–BuildKit) builds work; buildx still sets TARGETARCH when needed.
+FROM golang:${GO_VERSION} AS build
 WORKDIR /src
 
 # Download dependencies as a separate step to take advantage of Docker's caching.
@@ -31,7 +32,8 @@ ARG TARGETARCH
 # source code into the container.
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./src
+    if [ -n "$TARGETARCH" ]; then export GOARCH="$TARGETARCH"; else export GOARCH="$(go env GOARCH)"; fi && \
+    CGO_ENABLED=0 go build -o /bin/server ./src
 
 ################################################################################
 # Create a new stage for running the application that contains the minimal
