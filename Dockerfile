@@ -32,8 +32,7 @@ ARG TARGETARCH
 # source code into the container.
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
-    if [ -n "$TARGETARCH" ]; then export GOARCH="$TARGETARCH"; else export GOARCH="$(go env GOARCH)"; fi && \
-    CGO_ENABLED=0 go build -o /bin/server ./src
+    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./src
 
 ################################################################################
 # Create a new stage for running the application that contains the minimal
@@ -74,7 +73,7 @@ USER appuser
 COPY --from=build /bin/server /bin/
 
 # Expose the port that the application listens on.
-EXPOSE 8081
+EXPOSE 8000
 
 # curl -sSf https://atlasgo.sh | sh
 # go get -u ariga.io/atlas-provider-gorm

@@ -6,9 +6,7 @@ services:
     env_file:
       - .env
     ports:
-      - 8081:8081
-    volumes:
-      - ./src:/src
+      - 8000:8000
     depends_on:
       migrate:
         condition: service_completed_successfully
