@@ -2,7 +2,6 @@ package routes
 
 import (
 	"dfunani/homehub-profiles/src/database/serialisers"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,7 +18,11 @@ func createProfileMedia(context *gin.Context, connection *gorm.DB, id string) {
 	fmt.Println(profile)
 
 	var media serialisers.ProfileMediaSerialiser
-	json.NewDecoder(context.Request.Body).Decode(&media)
+	err := context.BindJSON(&media)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	media.ProfileID = profileID
 
 	createdMedia := serialisers.CreateProfileMedia(connection, &media)
@@ -29,7 +32,11 @@ func createProfileMedia(context *gin.Context, connection *gorm.DB, id string) {
 
 func createProfile(context *gin.Context, connection *gorm.DB) {
 	var profile serialisers.ProfileSerialiser
-	json.NewDecoder(context.Request.Body).Decode(&profile)
+	err := context.BindJSON(&profile)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	created := serialisers.CreateProfile(connection, &profile)
 	log.Printf("[Profile] Profile created: %s", created.ID)
