@@ -44,5 +44,5 @@ func main() {
 
 	routes.BuildRoutes(service_router, connection)
 
-	app.Run(":8000")
+	app.Run(":80")
 }

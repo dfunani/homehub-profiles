@@ -28,7 +28,7 @@ type ProfileSerialiser struct {
 	Phone            string              `json:"phone"`
 	AvatarStorageKey string              `json:"avatar_storage_key"`
 	Links            []map[string]string `json:"links"`       // raw JSON array; stored as jsonb
-	Preferences      map[string]string   `json:"preferences"` // raw JSON object
+	Preferences      map[string]any      `json:"preferences"` // raw JSON object
 	Status           string              `json:"status"`
 
 	Media []ProfileMediaSerialiser `json:"media,omitempty"`
@@ -59,7 +59,7 @@ func (p *ProfileSerialiser) FromModel(m *models.Profile) *ProfileSerialiser {
 	}
 	out.Links = links
 
-	var preferences map[string]string
+	var preferences map[string]any
 	err = json.Unmarshal(m.Preferences, &preferences)
 	if err != nil {
 		panic("Failed to marshal preferences: " + err.Error())
