@@ -20,7 +20,7 @@ func main() {
 	environment := dbConfig.SetupEnvironment()
 	connection, db := database.SetupDatabase(&environment.DatabaseConfig)
 	defer db.Close()
-	// database.RunMigrations(&environment.DatabaseConfig)
+	database.RunMigrations(&environment.DatabaseConfig)
 
 	app := gin.New()
 	app.Use(middleware.Recovery())
