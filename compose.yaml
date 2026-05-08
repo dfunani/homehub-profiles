@@ -7,9 +7,6 @@ services:
       - .env
     ports:
       - 6000:80
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
 
   database:
     image: postgres:17
@@ -23,42 +20,4 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  # profiles-api-localstack:
-  #   image: localstack/localstack:latest
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./localstack:/var/lib/localstack/data
-  #     - "./scripts/init-localstack.sh:/etc/localstack/init/ready.d/init.sh"
-  #     # Go module root for init-localstack.sh (builds cmd/lambda or uses pre-built lambda-package.zip)
-  #     - "./:/tmp/source:ro"
-  #     - "./lambda-package:/tmp/lambda-package"
-  #     - "/var/run/docker.sock:/var/run/docker.sock"
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 10s
-
-  # Atlas migrations: runs after Postgres is up (not inside initdb — needs network + mounted /migrations).
-  # Re-runs on every `compose up`; `atlas migrate apply` is idempotent for already-applied revisions.
-  migrate:
-    image: arigaio/atlas:latest
-    depends_on:
-      database:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./migrations:/migrations:ro
-    command:
-      - migrate
-      - apply
-      - --url
-      - postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
-      - --dir
-      - file:///migrations
-    restart: "no"
 

@@ -1,72 +1,70 @@
 # syntax=docker/dockerfile:1
 
-# Comments are provided throughout this file to help you get started.
-# If you need more help, visit the Dockerfile reference guide at
-# https://docs.docker.com/go/dockerfile-reference/
-
-# Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
+# Match your module’s Go version (adjust if go.mod differs).
+ARG GO_VERSION=1.25.1
 
 ################################################################################
-# Create a stage for building the application.
-ARG GO_VERSION=1.25.1
-# Omit --platform=$BUILDPLATFORM: many hosts (e.g. CapRover) do not set BUILDPLATFORM,
-# which yields --platform= and breaks the parser. Default platform is the builder's.
-FROM golang:${GO_VERSION} AS build
+# Build the Go binary
+################################################################################
+FROM golang:${GO_VERSION}-alpine AS build
+
 WORKDIR /src
 
-# Download dependencies as a separate step to take advantage of layer caching.
+RUN apk add --no-cache git ca-certificates
+
 COPY go.mod go.sum ./
-RUN go mod download -x
+RUN go mod download
 
 COPY . .
 
-# Build an ARM64 binary to match the aarch64 runtime VM.
-ARG TARGETARCH=arm64
-RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./src
+# Default amd64; override for ARM hosts / CapRover ARM:
+#   docker build --build-arg TARGETARCH=arm64 .
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /bin/server ./src
 
 ################################################################################
-# Create a new stage for running the application that contains the minimal
-# runtime dependencies for the application. This often uses a different base
-# image from the build stage where the necessary files are copied from the build
-# stage.
-#
-# The example below uses the alpine image as the foundation for running the app.
-# By specifying the "latest" tag, it will also use whatever happens to be the
-# most recent version of that image when you build your Dockerfile. If
-# reproducibility is important, consider using a versioned tag
-# (e.g., alpine:3.17.2) or SHA (e.g., alpine@sha256:c41ab5c992deb4fe7e5da09f67a8804a46bd0592bfdf0b1847dde0e0889d2bff).
-FROM alpine:latest AS final
+# Atlas CLI binary (copied into final image)
+################################################################################
+FROM arigaio/atlas:latest AS atlas
 
-# Install runtime dependencies needed to run the application.
-RUN apk --update add \
+################################################################################
+# Runtime image
+################################################################################
+FROM alpine:3.20 AS final
+
+RUN apk add --no-cache \
         ca-certificates \
         tzdata \
-        && \
-        update-ca-certificates
+        postgresql16-client \
+    && update-ca-certificates
 
-# Create a non-privileged user that the app will run under.
-# See https://docs.docker.com/go/dockerfile-user-best-practices/
 ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
+RUN adduser -D -h /home/appuser -u "${UID}" appuser
+
+ENV HOME=/home/appuser
+ENV GOCACHE=/home/appuser/.cache/go-build
+ENV GOMODCACHE=/home/appuser/go/pkg/mod
 
 WORKDIR /app
 
-# Copy the executable from the "build" stage.
 COPY --from=build /bin/server /app/server
 
-RUN chown -R appuser:appuser /app
+# Official image keeps the binary here; if COPY fails, run:
+#   docker run --rm --entrypoint ls arigaio/atlas:latest -la /
+COPY --from=atlas /atlas /usr/local/bin/atlas
+
+COPY migrations /app/migrations
+COPY atlas.hcl /app/atlas.hcl
+COPY scripts/entrypoint.sh /app/entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh \
+ && chown -R appuser:appuser /app /home/appuser
 
 USER appuser
 
-# Expose the port that the application listens on.
 EXPOSE 80
 
-# What the container should run when it is started.
-ENTRYPOINT [ "/app/server" ]
+ENTRYPOINT ["/app/entrypoint.sh"]
