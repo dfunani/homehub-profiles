@@ -20,7 +20,7 @@ COPY . .
 # Default amd64; override for ARM hosts / CapRover ARM:
 #   docker build --build-arg TARGETARCH=arm64 .
 ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+ARG TARGETARCH=armd64
 
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w" -o /bin/server ./src
